@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iot-demo 实时温湿度监控</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .header h1 { font-size: 20px; font-weight: 600; margin-right: auto; }
+    .stat {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .stat b { color: #e2e8f0; font-size: 15px; margin-left: 6px; }
+    .dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #64748b;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .dot.on  { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .dot.off { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 { font-size: 14px; font-weight: 500; color: #94a3b8; margin-bottom: 4px; }
+    .card .value { font-size: 34px; font-weight: 700; margin-bottom: 8px; }
+    .temp .value { color: #f97316; }
+    .humi .value { color: #38bdf8; }
+    .chart { width: 100%; height: 300px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>iot-demo 实时温湿度监控</h1>
+    <div class="stat"><span id="dot" class="dot"></span>连接状态<b id="conn">连接中…</b></div>
+    <div class="stat">设备<b id="device">-</b></div>
+    <div class="stat">消息数<b id="count">0</b></div>
+  </div>
+  <div class="grid">
+    <div class="card temp"><h2>温度（℃）</h2><div class="value" id="tempVal">--</div><div id="tempChart" class="chart"></div></div>
+    <div class="card humi"><h2>湿度（%RH）</h2><div class="value" id="humiVal">--</div><div id="humiChart" class="chart"></div></div>
+  </div>
+
+  <script src="/vendor/echarts/echarts.min.js"></script>
+  <script>
+    const MAX_POINTS = 100;
+    const times = [];
+    const temps = [];
+    const humis = [];
+
+    const tempChart = echarts.init(document.getElementById('tempChart'));
+    const humiChart = echarts.init(document.getElementById('humiChart'));
+    window.addEventListener('resize', () => { tempChart.resize(); humiChart.resize(); });
+
+    function baseOption(color, name, unit) {
+      return {
+        animation: false,
+        grid: { left: 50, right: 16, top: 24, bottom: 28 },
+        tooltip: { trigger: 'axis' },
+        xAxis: {
+          type: 'category',
+          data: times,
+          axisLine: { lineStyle: { color: '#475569' } },
+          axisLabel: { color: '#94a3b8' },
+        },
+        yAxis: {
+          type: 'value',
+          scale: true,
+          name: unit,
+          nameTextStyle: { color: '#94a3b8' },
+          splitLine: { lineStyle: { color: '#334155' } },
+          axisLabel: { color: '#94a3b8' },
+        },
+        series: [{
+          name,
+          type: 'line',
+          data: [],
+          smooth: true,
+          showSymbol: false,
+          lineStyle: { color, width: 2 },
+          areaStyle: { color: color + '33' },
+        }],
+      };
+    }
+    let tempOption = baseOption('#f97316', '温度', '℃');
+    let humiOption = baseOption('#38bdf8', '湿度', '%');
+
+    function fmtTime(ts) {
+      const d = new Date(ts);
+      const p = (n) => String(n).padStart(2, '0');
+      return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+
+    function render() {
+      tempOption.xAxis.data = times;
+      tempOption.series[0].data = temps;
+      humiOption.xAxis.data = times;
+      humiOption.series[0].data = humis;
+      tempChart.setOption(tempOption);
+      humiChart.setOption(humiOption);
+    }
+
+    function addPoint(data) {
+      times.push(fmtTime(data.ts));
+      temps.push(Number(data.temperature));
+      humis.push(Number(data.humidity));
+      if (times.length > MAX_POINTS) { times.shift(); temps.shift(); humis.shift(); }
+      document.getElementById('tempVal').textContent = Number(data.temperature).toFixed(2);
+      document.getElementById('humiVal').textContent = Number(data.humidity).toFixed(2);
+      document.getElementById('device').textContent = data.deviceId;
+      document.getElementById('count').textContent = times.length;
+      render();
+    }
+
+    // 初始历史数据
+    fetch('/api/history')
+      .then((r) => r.json())
+      .then((list) => { list.forEach(addPoint); })
+      .catch(() => {});
+
+    // SSE 实时推送
+    const es = new EventSource('/api/stream');
+    const dot = document.getElementById('dot');
+    const conn = document.getElementById('conn');
+    es.onopen = () => { dot.className = 'dot on'; conn.textContent = '已连接'; };
+    es.onerror = () => { dot.className = 'dot off'; conn.textContent = '断开'; };
+    es.onmessage = (e) => { addPoint(JSON.parse(e.data)); };
+  </script>
+</body>
+</html>

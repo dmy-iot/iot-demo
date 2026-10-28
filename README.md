@@ -29,27 +29,36 @@ npm run web   # 终端 3：Web 仪表盘
 
 ## 验证记录
 
-- 2026-10-21：`npm run pub` + `npm run web` 启动后，页面连接状态显示"已连接"，温度/湿度曲线约每 2 秒滚动新增一个数据点，消息计数持续增长。
-测试图形化提交
-测试图形化提交练习
-flowchart TD
- subgraph exp2["实验报告二"]
- Br2[Web browser]
- subgraph webserver["Web server<br/>Http://localhost:3000"]
- I2[Index.html]
- Se2[server.js]
- end
- S2[subscriber.js]
- B2[MQTT Broker<br/>Localhost:1883]
- P2[publisher.js<br/>(IoT device)]
+- **2026-10-21 功能验证**
+  - `npm run pub` + `npm run web` 启动后，Web 服务成功连接 Broker 并订阅 `iot/demo/temperature`。
+  - 浏览器打开 `http://localhost:3000` 返回 HTTP 200，连接状态显示"已连接"。
+  - 温度/湿度曲线约每 2 秒滚动新增一个数据点，消息计数持续增长。
 
-```
+- **2026-10-28 Broker 离线容错验证**
+  - 停止 Mosquitto 后运行 `npm run pub`，修复后的发布端仅输出一条"无法连接 Broker，将自动重连"提示，不再重复刷屏。
+  - 错误信息包含错误码，不再出现空白 `[PUB] Error:`。
+
+- **2026-10-28 文档检查**
+  - README 中的 Mermaid 架构图代码围栏成对（共 6 个），图表可正常渲染。
+
+```mermaid
+flowchart TD
+  subgraph exp2["实验报告二"]
+    Br2[Web browser]
+    subgraph webserver["Web server<br/>http://localhost:3000"]
+      I2[index.html]
+      Se2[server.js]
+    end
+    S2[subscriber.js]
+    B2[MQTT Broker<br/>localhost:1883]
+    P2[publisher.js<br/>(IoT device)]
+
     P2 --> B2
     B2 --> S2
     B2 --> Se2
     Se2 --> I2
     I2 <--> Br2
-end
-style webserver stroke-dasharray:5 5,fill:none
-style exp2 fill:none
+  end
+  style webserver stroke-dasharray:5 5,fill:none
+  style exp2 fill:none
 ```

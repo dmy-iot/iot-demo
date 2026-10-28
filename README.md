@@ -32,3 +32,24 @@ npm run web   # 终端 3：Web 仪表盘
 - 2026-10-21：`npm run pub` + `npm run web` 启动后，页面连接状态显示"已连接"，温度/湿度曲线约每 2 秒滚动新增一个数据点，消息计数持续增长。
 测试图形化提交
 测试图形化提交练习
+flowchart TD
+ subgraph exp2["实验报告二"]
+ Br2[Web browser]
+ subgraph webserver["Web server<br/>Http://localhost:3000"]
+ I2[Index.html]
+ Se2[server.js]
+ end
+ S2[subscriber.js]
+ B2[MQTT Broker<br/>Localhost:1883]
+ P2[publisher.js<br/>(IoT device)]
+
+```
+    P2 --> B2
+    B2 --> S2
+    B2 --> Se2
+    Se2 --> I2
+    I2 <--> Br2
+end
+style webserver stroke-dasharray:5 5,fill:none
+style exp2 fill:none
+```
